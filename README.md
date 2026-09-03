@@ -26,6 +26,18 @@ python -m graph_rag ping
 
 `ping` writes one test item to the `graph` container. PDF ingest and question answering are Phase 1.
 
+## Credit desk UI
+
+Search the sample CLO PDFs and allocate advances to obligors:
+
+```bash
+source .venv/bin/activate
+pip install -e .
+python -m uvicorn main:app --host 127.0.0.1 --port 8000
+```
+
+Open http://127.0.0.1:8000 — **Documents** for search/view, **Disbursements** to split unused delayed-draw room across Apex, Helios, and the other names.
+
 Sample (fictional) CLO PDFs live in `data/pdfs/`. Regenerate with:
 
 ```bash

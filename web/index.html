@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Northbridge CLO desk</title>
+  <link rel="stylesheet" href="/static/app.css?v=hitl1" />
+</head>
+<body>
+  <header class="mast">
+    <div>
+      <p class="eyebrow">Meridian Credit Partners · Harbor Trust Company</p>
+      <h1>Northbridge CLO 2024-1</h1>
+    </div>
+    <p class="deal-meta">Credit desk · fictional sample book</p>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button id="tab-docs" class="is-on" type="button">Documents</button>
+    <button id="tab-pay" type="button">Disbursements</button>
+  </nav>
+
+  <main id="view-docs" class="layout docs">
+    <aside class="rail">
+      <form id="search-form">
+        <label for="q">Search the file</label>
+        <div class="search-row">
+          <input id="q" name="q" type="search" placeholder="Apex, OC test, Priya Raman…" autocomplete="off" />
+          <button type="submit">Find</button>
+        </div>
+      </form>
+      <p id="search-status" class="hint"></p>
+      <ul id="doc-list"></ul>
+      <ul id="hit-list"></ul>
+    </aside>
+    <article class="reader">
+      <header class="reader-head">
+        <div>
+          <h2 id="doc-title">Select a document</h2>
+          <p id="doc-file" class="hint"></p>
+        </div>
+        <div class="pager">
+          <button id="page-prev" class="ghost" type="button">Prev</button>
+          <span id="page-label" class="hint"></span>
+          <button id="page-next" class="ghost" type="button">Next</button>
+          <a id="doc-download" class="ghost" hidden href="#">Open PDF</a>
+        </div>
+      </header>
+      <div class="page-stage" id="page-stage">
+        <div class="page-sheet">
+          <img id="page-img" alt="PDF page" />
+          <div id="boxes"></div>
+        </div>
+      </div>
+      <p class="hint" id="page-hint">Boxes mark the quote each field was read from. The green box is the field you are reviewing. Click a box or a citation to jump there.</p>
+    </article>
+    <aside class="review">
+      <h3>Human review</h3>
+      <p class="hint" id="review-status">Extracted fields need a check before they feed the desk.</p>
+      <div id="field-list"></div>
+    </aside>
+  </main>
+
+  <main id="view-pay" class="layout pay" hidden>
+    <section class="ledger">
+      <div class="pool">
+        <div>
+          <p class="eyebrow">Available to disburse</p>
+          <p id="pool-value" class="figure">—</p>
+        </div>
+        <div class="actions">
+          <button id="btn-prorata" type="button">Split by unused commitment</button>
+          <button id="btn-clear" class="ghost" type="button">Clear</button>
+        </div>
+      </div>
+      <p class="hint">
+        Advances go to loan obligors against unused delayed-draw / revolver room.
+        Edit any line, then confirm. Senior notes are shown only as a waterfall of the same cash.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Obligor</th>
+            <th>Held par</th>
+            <th>Unused</th>
+            <th>Advance</th>
+          </tr>
+        </thead>
+        <tbody id="ob-body"></tbody>
+      </table>
+      <div class="confirm-row">
+        <label class="grow">
+          Memo
+          <input id="memo" type="text" placeholder="September delayed-draw advances" />
+        </label>
+        <p id="pay-total" class="figure small">$0</p>
+        <button id="btn-confirm" type="button">Confirm disbursement</button>
+      </div>
+      <p id="pay-error" class="error" hidden></p>
+    </section>
+    <aside class="side">
+      <h3>Noteholder waterfall</h3>
+      <p class="hint">If this cash were interest/principal proceeds, it would pay in this order.</p>
+      <ul id="waterfall"></ul>
+      <h3>Ledger</h3>
+      <ul id="batches"></ul>
+    </aside>
+  </main>
+
+  <script src="/static/app.js?v=hitl3"></script>
+</body>
+</html>
