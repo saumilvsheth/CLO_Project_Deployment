@@ -1,46 +1,19 @@
-# Graph RAG (PDF → Cosmos DB → Agent)
+# CLO Document Intelligence
 
-Python Graph RAG using Microsoft Agent Framework and Azure Cosmos DB for NoSQL. Planning notes: [docs/graph-rag-plan.md](docs/graph-rag-plan.md).
+Azure-first pipeline for CLO PDFs: ingest → extract (layout + bounding boxes) → map to a canonical schema → validate → human review.
 
-## Azure (already chosen)
+Phase 1 of the architecture in `docs/architecture.md` is implemented locally. GraphRAG and the agent layer are stubs for later phases.
 
-- Subscription: `Azure subscription 1`
-- Resource group: `rg-saumilsheth-2906` (`eastus2`)
-- Foundry: project `saumilsheth-7860`, chat `Kimi-K2.6`, embeddings `text-embedding-3-small`
-- Cosmos: serverless account `clo-graphrag`, database `graph_rag`
-
-Sign in once: `az login`
-
-## Setup
-
-Use Python 3.11 (3.14 is not the target runtime).
+## Run locally
 
 ```bash
 python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -e .
-cp .env.example .env
-az login
-python -m graph_rag ping
+python -m clo_intel run
+python -m clo_intel serve
 ```
 
-`ping` writes one test item to the `graph` container. PDF ingest and question answering are Phase 1.
+Open http://127.0.0.1:8000 — review extracted fields against the PDF page they came from (Verify / Edit / Reject).
 
-## Credit desk UI
-
-Search the sample CLO PDFs and allocate advances to obligors:
-
-```bash
-source .venv/bin/activate
-pip install -e .
-python -m uvicorn main:app --host 127.0.0.1 --port 8000
-```
-
-Open http://127.0.0.1:8000 — **Documents** for search/view, **Disbursements** to split unused delayed-draw room across Apex, Helios, and the other names.
-
-Sample (fictional) CLO PDFs live in `data/pdfs/`. Regenerate with:
-
-```bash
-pip install fpdf2
-python scripts/generate_sample_pdfs.py
-```
+Sample (fictional) Northbridge CLO PDFs live in `data/pdfs/`.

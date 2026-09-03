@@ -9,6 +9,7 @@ __pycache__/
 data/pdfs/*
 !data/pdfs/.gitkeep
 !data/pdfs/northbridge-clo-*.pdf
-data/disbursements.json
+data/extractions/
 data/reviews.json
+data/runs/
 .DS_Store
