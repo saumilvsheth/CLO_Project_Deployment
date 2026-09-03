@@ -3,21 +3,25 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from clo_intel.answer import answer_question
 from clo_intel import review
+from clo_intel.config import PDF_DIR
 from clo_intel.extract import locate_quote, page_count, render_page_png
 from clo_intel.library import get_document, list_pdfs
 from clo_intel.sample_book import deal_for_document
-from clo_intel.pipeline import run_all
+from clo_intel.pipeline import run_all, run_document
 from clo_intel.search import build_index, search as hybrid_search
 from clo_intel.store import list_runs
 
 WEB = Path(__file__).resolve().parents[2] / "web"
+
+# In-memory upload job status: job_id -> dict
+_UPLOAD_JOBS: dict[str, dict] = {}
 
 
 @asynccontextmanager
@@ -45,6 +49,74 @@ class AskBody(BaseModel):
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(WEB / "index.html")
+
+
+@app.post("/api/upload")
+async def upload_pdf(background_tasks: BackgroundTasks, file: UploadFile = File(...)) -> dict:
+    import uuid, re
+
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+
+    # Sanitise filename: keep alphanumeric, hyphens, underscores; replace spaces with hyphens
+    safe_name = re.sub(r"[^\w\-.]", "-", file.filename.replace(" ", "-")).strip("-")
+    if not safe_name.lower().endswith(".pdf"):
+        safe_name += ".pdf"
+
+    dest = PDF_DIR / safe_name
+    if dest.exists():
+        raise HTTPException(
+            status_code=409,
+            detail=f"A file named {safe_name!r} already exists. Rename and re-upload.",
+        )
+
+    content = await file.read()
+    if len(content) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    PDF_DIR.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(content)
+
+    job_id = uuid.uuid4().hex[:12]
+    _UPLOAD_JOBS[job_id] = {"status": "queued", "filename": safe_name, "documentId": dest.stem}
+
+    def _process(job_id: str, path: Path) -> None:
+        from clo_intel.library import Document
+        from clo_intel.sample_book import title_for_filename
+        from clo_intel.graph import clear_graph_cache
+        from pypdf import PdfReader
+
+        _UPLOAD_JOBS[job_id]["status"] = "processing"
+        try:
+            reader = PdfReader(str(path))
+            page_texts = [(page.extract_text() or "") for page in reader.pages]
+            doc = Document(
+                id=path.stem,
+                filename=path.name,
+                title=title_for_filename(path.name),
+                pages=len(reader.pages),
+                text="\n\n".join(page_texts),
+                path=path,
+                page_texts=page_texts,
+            )
+            run_document(doc)
+            build_index()
+            clear_graph_cache()
+            _UPLOAD_JOBS[job_id]["status"] = "done"
+        except Exception as exc:  # noqa: BLE001
+            _UPLOAD_JOBS[job_id]["status"] = "error"
+            _UPLOAD_JOBS[job_id]["error"] = str(exc)
+
+    background_tasks.add_task(_process, job_id, dest)
+    return {"jobId": job_id, "filename": safe_name, "documentId": dest.stem, "status": "queued"}
+
+
+@app.get("/api/upload/{job_id}")
+def upload_status(job_id: str) -> dict:
+    job = _UPLOAD_JOBS.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Unknown job ID.")
+    return job
 
 
 @app.post("/api/pipeline/run")

@@ -64,6 +64,57 @@ function pendingByDoc() {
   return Object.fromEntries((dash.documents || []).map((d) => [d.documentId, d.pending]));
 }
 
+function graphCenter() {
+  const data = window.__graph;
+  if (!data?.nodes?.length) return null;
+  return data.nodes.find((n) => n.id === data.center) || null;
+}
+
+function entityLead(name) {
+  const match = String(name || "")
+    .toLowerCase()
+    .match(/[a-z][a-z0-9]{3,}/);
+  return match ? match[0] : "";
+}
+
+function itemMentionsEntity(item, name) {
+  const full = String(name || "").trim().toLowerCase();
+  const lead = entityLead(name);
+  if (!full && !lead) return false;
+  const blob = `${item.title || ""} ${item.label || ""} ${item.dealName || ""} ${item.documentId || ""}`.toLowerCase();
+  return (full && blob.includes(full)) || (lead && blob.includes(lead));
+}
+
+function scopedReviewItems(items) {
+  const center = graphCenter();
+  if (!center) return items;
+  if (center.label === "Deal" || center.label === "Tranche") {
+    return items.filter((item) => item.dealId && item.dealId === center.dealId);
+  }
+  const slug = String(center.slug || center.id.split(":")[1] || "").toLowerCase();
+  const lead = entityLead(center.name);
+  const full = String(center.name || "").trim().toLowerCase();
+  return items.filter((item) => {
+    if (center.documentId && item.documentId === center.documentId) return true;
+    const doc = `${item.documentId || ""}`.toLowerCase();
+    const title = `${item.title || ""} ${item.label || ""}`.toLowerCase();
+    if (center.label === "Obligor" && slug) {
+      return doc.includes(`-${slug}-credit-memo`) || title.includes(full);
+    }
+    return itemMentionsEntity(item, center.name) || (lead && title.includes(lead) && /credit memo|allocation/i.test(title));
+  });
+}
+
+function fieldInGraphScope(field) {
+  if (!graphCenter()) return true;
+  const all = [...(dash.open || []), ...(dash.approved || []), ...(dash.closed || [])];
+  return scopedReviewItems(all).some((item) => item.fieldId === field.id);
+}
+
+function scopedPendingFields() {
+  return fields.filter((f) => isNumericPending(f) && fieldInGraphScope(f));
+}
+
 function renderDocList(documents) {
   const pending = pendingByDoc();
   $("doc-list").innerHTML = documents
@@ -98,19 +149,6 @@ function setDashTab(tab) {
 
 function renderDashboard() {
   const t = dash.totals || {};
-  const stats = [
-    ["open", t.open, "Open"],
-    ["approved", t.approved, "Approved"],
-    ["closed", t.closed, "Closed"],
-    ["total", t.total, "Total"],
-  ];
-  $("dash-stats").innerHTML = stats
-    .map(([key, n, label]) => {
-      const tab = key === "total" ? "" : ` data-tab="${key}"`;
-      const on = key === dashTab ? " is-on" : "";
-      return `<button type="button" class="dash-stat ${key}${on}"${tab}><strong>${n ?? "—"}</strong><span>${label}</span></button>`;
-    })
-    .join("");
   $("mast-open").textContent = t.open ?? "—";
   $("mast-approved").textContent = t.approved ?? "—";
   $("mast-closed").textContent = t.closed ?? "—";
@@ -120,9 +158,37 @@ function renderDashboard() {
   document.querySelectorAll("#dash-tabs button[data-tab]").forEach((btn) => {
     btn.classList.toggle("is-on", btn.dataset.tab === dashTab);
   });
-  const items = dash[dashTab] || [];
+  const center = graphCenter();
+  const open = scopedReviewItems(dash.open || []);
+  const approved = scopedReviewItems(dash.approved || []);
+  const closed = scopedReviewItems(dash.closed || []);
+  const scoped = { open, approved, closed, total: [...open, ...closed] };
+  const counts = {
+    open: open.length,
+    approved: approved.length,
+    closed: closed.length,
+    total: scoped.total.length,
+  };
+  $("resolve-scope").textContent = center
+    ? `${center.label}: ${center.name}`
+    : "Dollar amounts and OC ratios for the entity on the knowledge graph.";
+  const stats = [
+    ["open", counts.open, "Open"],
+    ["approved", counts.approved, "Approved"],
+    ["closed", counts.closed, "Closed"],
+    ["total", counts.total, "Total"],
+  ];
+  $("dash-stats").innerHTML = stats
+    .map(([key, n, label]) => {
+      const tab = key === "total" ? "" : ` data-tab="${key}"`;
+      const on = key === dashTab ? " is-on" : "";
+      return `<button type="button" class="dash-stat ${key}${on}"${tab}><strong>${n ?? "—"}</strong><span>${label}</span></button>`;
+    })
+    .join("");
+  const items = scoped[dashTab] || [];
   if (!items.length) {
-    $("dash-list").innerHTML = `<p class="hint">No ${dashTab} items.</p>`;
+    const who = center ? ` for ${escapeHtml(center.name)}` : "";
+    $("dash-list").innerHTML = `<p class="hint">No ${dashTab} numbers${who}.</p>`;
     return;
   }
   $("dash-list").innerHTML = items
@@ -180,30 +246,26 @@ async function openDoc(id, page, quote) {
     const located = await api(`/api/locate?doc=${encodeURIComponent(id)}&q=${encodeURIComponent(quote)}`);
     highlightCitations = located.citations || [];
   }
+  $("doc-title").textContent = extracted.title || id;
+  $("doc-file").textContent = `${extracted.filename || ""} · ${extracted.documentType || ""}`;
+  if (!skipGraphFromDoc) await loadGraph({ doc: id });
+  const pending = scopedPendingFields();
+  if (keepField && pending.some((f) => f.id === keepField)) {
+    selectedField = keepField;
+  } else {
+    selectedField = pending[0]?.id || null;
+  }
   if (page) {
     currentPage = page;
   } else if (highlightCitations[0]) {
     currentPage = highlightCitations[0].page;
   } else {
-    currentPage = fields.filter(isNumericPending)[0]?.citations?.[0]?.page || 1;
+    currentPage = pending[0]?.citations?.[0]?.page || 1;
   }
-  const pending = fields.filter(isNumericPending);
-  if (keepField && fields.some((f) => f.id === keepField && isNumericPending(f))) {
-    selectedField = keepField;
-  } else {
-    selectedField = pending[0]?.id || null;
-  }
-  $("doc-title").textContent = extracted.title || id;
-  $("doc-file").textContent = `${extracted.filename || ""} · ${extracted.documentType || ""}`;
-  $("review-status").textContent = pending.length
-    ? `${pending.length} number${pending.length === 1 ? "" : "s"} waiting for review`
-    : fields.some(isNumericField)
-      ? "All numeric fields on this file have been reviewed"
-      : "No numeric fields to review on this file";
+  setReviewStatus();
   renderFields();
   renderPage();
   renderDashboard();
-  if (!skipGraphFromDoc) loadGraph({ doc: id });
   if (extracted.dealId) {
     const keepPay = window.__pay?.dealId === extracted.dealId ? window.__pay.paymentDate : "";
     loadDisbursement(extracted.dealId, keepPay);
@@ -217,8 +279,31 @@ function primaryCitations(field) {
   return cites.filter((c) => c.page === first.page && Math.abs(c.bbox.y0 - first.bbox.y0) < 0.04);
 }
 
+function setReviewStatus() {
+  const center = graphCenter();
+  const pending = scopedPendingFields();
+  const fileNumeric = fields.filter(isNumericField);
+  const who = center ? center.name : "this entity";
+  if ($("this-file-label")) {
+    $("this-file-label").textContent = center ? `This file · ${center.name}` : "This file";
+  }
+  if (pending.length) {
+    $("review-status").textContent = `${pending.length} number${pending.length === 1 ? "" : "s"} for ${who} waiting on this file`;
+    return;
+  }
+  if (fileNumeric.some((f) => fieldInGraphScope(f))) {
+    $("review-status").textContent = `All numbers for ${who} on this file have been reviewed`;
+    return;
+  }
+  if (fileNumeric.length) {
+    $("review-status").textContent = `This file has no dollar amounts or OC ratios for ${who}`;
+    return;
+  }
+  $("review-status").textContent = "No numeric fields to review on this file";
+}
+
 function renderFields() {
-  const pending = fields.filter(isNumericPending);
+  const pending = scopedPendingFields();
   if (!pending.length) {
     $("field-list").innerHTML = "";
     return;
@@ -263,8 +348,7 @@ function renderPage() {
   $("page-label").textContent = `Page ${currentPage} of ${pageCount}`;
   $("page-img").src = `/api/documents/${currentDoc.id}/pages/${currentPage}?t=${Date.now()}`;
   const boxes = [];
-  for (const field of fields) {
-    if (!isNumericPending(field)) continue;
+  for (const field of scopedPendingFields()) {
     for (const cite of primaryCitations(field).filter((c) => c.page === currentPage)) {
       boxes.push({
         fieldId: field.id,
@@ -328,7 +412,7 @@ function markResolved(id, status, value) {
   const field = fields.find((f) => f.id === id);
   if (!field) return;
   field.review = { ...(field.review || {}), status, value: value ?? field.review?.value ?? field.value };
-  const next = fields.find((f) => f.id !== id && isNumericPending(f));
+  const next = scopedPendingFields().find((f) => f.id !== id);
   selectedField = next?.id || id;
   renderFields();
   renderPage();
@@ -769,6 +853,16 @@ async function loadGraph(opts) {
     const data = await api(`/api/graph/neighborhood?${params}`);
     window.__graph = data;
     renderGraph(data);
+    renderDashboard();
+    if (currentDoc) {
+      const pending = scopedPendingFields();
+      if (selectedField && !pending.some((f) => f.id === selectedField)) {
+        selectedField = pending[0]?.id || null;
+      }
+      setReviewStatus();
+      renderFields();
+      renderPage();
+    }
     const center = (data.nodes || []).find((n) => n.id === data.center);
     if (center?.label === "Deal" && center.dealId) loadDisbursement(center.dealId);
   } catch (err) {
@@ -1182,3 +1276,89 @@ function bindTabComplete(el, list, hintEl) {
 
 bindTabComplete($("q"), SEARCH_SUGGESTIONS, $("search-suggest"));
 bindTabComplete($("question"), ASK_SUGGESTIONS, $("ask-suggest"));
+
+// ── PDF Upload ────────────────────────────────────────────────
+const uploadZone = $("upload-zone");
+const uploadInput = $("upload-input");
+const uploadStatus = $("upload-status");
+
+function setUploadStatus(msg, cls) {
+  uploadStatus.textContent = msg;
+  uploadStatus.className = "hint upload-status" + (cls ? ` ${cls}` : "");
+  uploadStatus.hidden = !msg;
+}
+
+async function handleUploadFile(file) {
+  if (!file || !file.name.toLowerCase().endsWith(".pdf")) {
+    setUploadStatus("Only PDF files can be uploaded.", "is-error");
+    return;
+  }
+  setUploadStatus(`Uploading ${file.name}…`);
+  uploadZone.setAttribute("aria-busy", "true");
+
+  const form = new FormData();
+  form.append("file", file);
+  let job;
+  try {
+    job = await api("/api/upload", { method: "POST", body: form });
+  } catch (err) {
+    setUploadStatus(err.message, "is-error");
+    uploadZone.removeAttribute("aria-busy");
+    return;
+  }
+
+  setUploadStatus(`Processing ${job.filename}…`);
+
+  // Poll until done or error (max ~90 s)
+  const maxAttempts = 45;
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise((r) => setTimeout(r, 2000));
+    let status;
+    try {
+      status = await api(`/api/upload/${job.jobId}`);
+    } catch {
+      break;
+    }
+    if (status.status === "done") {
+      setUploadStatus(`${job.filename} processed and added to the library.`, "is-ok");
+      uploadZone.removeAttribute("aria-busy");
+      // Reload doc list and open the new document
+      await loadDocs();
+      const docId = job.documentId;
+      if (docId) {
+        const items = document.querySelectorAll("#doc-list button[data-id]");
+        const match = [...items].find((b) => b.dataset.id === docId);
+        if (match) match.click();
+        else await openDoc(docId);
+      }
+      await refreshDashboard();
+      return;
+    }
+    if (status.status === "error") {
+      setUploadStatus(`Processing failed: ${status.error || "unknown error"}`, "is-error");
+      uploadZone.removeAttribute("aria-busy");
+      return;
+    }
+  }
+
+  setUploadStatus("Still processing in the background — refresh in a moment.", "");
+  uploadZone.removeAttribute("aria-busy");
+}
+
+uploadZone.addEventListener("click", () => uploadInput.click());
+uploadZone.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") uploadInput.click(); });
+uploadInput.addEventListener("change", () => {
+  const f = uploadInput.files?.[0];
+  uploadInput.value = "";
+  if (f) handleUploadFile(f);
+});
+
+// Drag-and-drop
+uploadZone.addEventListener("dragover", (e) => { e.preventDefault(); uploadZone.classList.add("drag-over"); });
+uploadZone.addEventListener("dragleave", () => uploadZone.classList.remove("drag-over"));
+uploadZone.addEventListener("drop", (e) => {
+  e.preventDefault();
+  uploadZone.classList.remove("drag-over");
+  const f = e.dataTransfer?.files?.[0];
+  if (f) handleUploadFile(f);
+});

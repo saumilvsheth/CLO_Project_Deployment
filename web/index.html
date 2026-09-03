@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>CLO Document Intelligence</title>
-  <link rel="stylesheet" href="/static/app.css?v=pay2" />
+  <link rel="stylesheet" href="/static/app.css?v=upload1" />
 </head>
 <body>
   <header class="mast">
@@ -48,6 +48,12 @@
       <div id="answer-box" hidden>
         <div id="answer-text"></div>
       </div>
+      <div class="upload-zone" id="upload-zone" role="button" tabindex="0" aria-label="Upload a PDF">
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" width="18" height="18"><path d="M10 3v10M6 7l4-4 4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 14v1a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        <span>Upload PDF</span>
+        <input type="file" id="upload-input" accept=".pdf" hidden />
+      </div>
+      <div id="upload-status" class="hint upload-status" hidden></div>
       <p class="hint">Source PDFs. Boxes mark quotes still waiting for approval.</p>
       <ul id="doc-list"></ul>
     </aside>
@@ -85,7 +91,7 @@
     </article>
     <aside class="review">
       <h3>Resolution</h3>
-      <p class="hint">Human-in-the-loop queue for dollar amounts and OC ratios.</p>
+      <p class="hint" id="resolve-scope">Dollar amounts and OC ratios for the entity on the knowledge graph.</p>
       <div class="dash-stats" id="dash-stats"></div>
       <div class="dash-tabs" id="dash-tabs">
         <button type="button" data-tab="open" class="is-on">Open</button>
@@ -93,11 +99,11 @@
         <button type="button" data-tab="closed">Closed</button>
       </div>
       <div id="dash-list" class="dash-list"></div>
-      <h4 class="this-file">This file</h4>
+      <h4 class="this-file" id="this-file-label">This file</h4>
       <p class="hint" id="review-status">Lowest confidence first. Approve or edit each boxed field.</p>
       <div id="field-list"></div>
     </aside>
   </main>
-  <script src="/static/app.js?v=pay2"></script>
+  <script src="/static/app.js?v=upload1"></script>
 </body>
 </html>

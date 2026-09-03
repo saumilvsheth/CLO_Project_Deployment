@@ -324,6 +324,11 @@ ul { list-style: none; padding: 0; margin: 0.6rem 0 0; }
 }
 .g-edge { fill: none; stroke: #b7ad9c; stroke-width: 1.5; pointer-events: none; }
 .review h3 { margin: 0 0 0.35rem; font-size: 1rem; }
+#resolve-scope {
+  margin: 0;
+  font-weight: 600;
+  color: var(--ink);
+}
 .review .this-file {
   margin: 1rem 0 0.2rem;
   font-size: 0.85rem;
@@ -443,6 +448,36 @@ ul { list-style: none; padding: 0; margin: 0.6rem 0 0; }
   padding: 0.35rem 0.45rem;
   border: 1px solid var(--rule);
 }
+
+/* ── Upload zone ─────────────────────────────────────────── */
+.upload-zone {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.7rem;
+  margin: 0.6rem 0 0;
+  border: 1.5px dashed var(--rule);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--muted);
+  transition: border-color 0.15s, color 0.15s;
+  user-select: none;
+}
+.upload-zone:hover,
+.upload-zone:focus,
+.upload-zone.drag-over {
+  border-color: var(--accent);
+  color: var(--accent);
+  outline: none;
+}
+.upload-zone svg { flex-shrink: 0; }
+.upload-status {
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+}
+.upload-status.is-error { color: var(--accent); }
+.upload-status.is-ok { color: var(--ok); }
 
 @media (max-width: 1100px) {
   .layout.docs { grid-template-columns: 1fr; }
