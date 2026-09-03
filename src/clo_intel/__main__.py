@@ -13,6 +13,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="clo-intel")
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("run", help="Extract and contextualize every PDF in data/pdfs")
+    sub.add_parser("graph", help="Backfill the Cosmos knowledge graph from the sample book and HITL reviews")
     serve = sub.add_parser("serve", help="Open the human-review UI")
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8000)
@@ -24,6 +25,13 @@ def main(argv: list[str] | None = None) -> int:
             print("No PDFs in data/pdfs/", file=sys.stderr)
             return 1
         print(json.dumps([r.model_dump(mode="json") for r in results], indent=2))
+        return 0
+
+    if args.cmd == "graph":
+        from clo_intel.graph import backfill_graph
+
+        result = backfill_graph()
+        print(json.dumps(result, indent=2))
         return 0
 
     import uvicorn

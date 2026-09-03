@@ -6,12 +6,7 @@ from pathlib import Path
 from pypdf import PdfReader
 
 from clo_intel.config import PDF_DIR
-
-TITLES = {
-    "northbridge-clo-2024-1-term-sheet.pdf": "Preliminary term sheet",
-    "northbridge-clo-2024-1-apex-credit-memo.pdf": "Apex Industrial credit memorandum",
-    "northbridge-clo-2024-1-monthly-report-aug-2024.pdf": "August 2024 monthly trustee report",
-}
+from clo_intel.sample_book import document_sort_key, title_for_filename
 
 
 @dataclass
@@ -22,22 +17,24 @@ class Document:
     pages: int
     text: str
     path: Path
+    page_texts: list[str]
 
 
 def list_pdfs() -> list[Document]:
     docs: list[Document] = []
     PDF_DIR.mkdir(parents=True, exist_ok=True)
-    for path in sorted(PDF_DIR.glob("*.pdf")):
+    for path in sorted(PDF_DIR.glob("*.pdf"), key=lambda p: document_sort_key(p.name)):
         reader = PdfReader(str(path))
-        pages = [(page.extract_text() or "") for page in reader.pages]
+        page_texts = [(page.extract_text() or "") for page in reader.pages]
         docs.append(
             Document(
                 id=path.stem,
                 filename=path.name,
-                title=TITLES.get(path.name, path.stem.replace("-", " ")),
+                title=title_for_filename(path.name),
                 pages=len(reader.pages),
-                text="\n\n".join(pages),
+                text="\n\n".join(page_texts),
                 path=path,
+                page_texts=page_texts,
             )
         )
     return docs

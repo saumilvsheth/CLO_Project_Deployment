@@ -1,7 +1,7 @@
 [project]
 name = "clo-document-intelligence"
 version = "0.1.0"
-description = "CLO document intelligence: extract, validate, and review trustee reports and related PDFs on Azure."
+description = "CLO document intelligence: extract, HITL review, knowledge graph, Ask, and indenture waterfall."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -13,6 +13,9 @@ dependencies = [
     "fastapi>=0.115.0",
     "uvicorn>=0.32.0",
     "azure-ai-documentintelligence>=1.0.0",
+    "openai>=1.40.0",
+    "fpdf2>=2.8.0",
+    "azure-cosmos>=4.9.0",
 ]
 
 [project.scripts]

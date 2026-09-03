@@ -5,109 +5,29 @@ from __future__ import annotations
 from pathlib import Path
 
 from clo_intel.extract import locate_quote
+from clo_intel.sample_book import field_specs
 from clo_intel.schema import ExtractedField, oc_ratio_out_of_range
 
 # quote must appear verbatim in the sample PDFs so bounding boxes can be drawn.
-FIELD_SPECS: list[dict] = [
-    {
-        "id": "deal-name",
-        "label": "Deal name",
-        "group": "Parties",
-        "document_id": "northbridge-clo-2024-1-term-sheet",
-        "quote": "Northbridge CLO 2024-1, Ltd.",
-        "value": "Northbridge CLO 2024-1, Ltd.",
-    },
-    {
-        "id": "manager",
-        "label": "Collateral manager",
-        "group": "Parties",
-        "document_id": "northbridge-clo-2024-1-term-sheet",
-        "quote": "Meridian Credit Partners LLC",
-        "value": "Meridian Credit Partners LLC",
-    },
-    {
-        "id": "trustee",
-        "label": "Trustee",
-        "group": "Parties",
-        "document_id": "northbridge-clo-2024-1-term-sheet",
-        "quote": "Harbor Trust Company, N.A.",
-        "value": "Harbor Trust Company, N.A.",
-    },
-    {
-        "id": "pm",
-        "label": "Portfolio manager",
-        "group": "Parties",
-        "document_id": "northbridge-clo-2024-1-term-sheet",
-        "quote": "Priya Raman",
-        "value": "Priya Raman",
-    },
-    {
-        "id": "class-a-par",
-        "label": "Class A par",
-        "group": "Capital structure",
-        "document_id": "northbridge-clo-2024-1-term-sheet",
-        "quote": "$248,000,000",
-        "value": "$248,000,000",
-    },
-    {
-        "id": "oc-trigger",
-        "label": "Class A/B OC trigger",
-        "group": "Covenants",
-        "document_id": "northbridge-clo-2024-1-term-sheet",
-        "quote": "minimum 122.5%",
-        "value": "122.5%",
-        "kind": "oc_ratio",
-    },
-    {
-        "id": "apex-name",
-        "label": "Obligor",
-        "group": "Apex Industrial",
-        "document_id": "northbridge-clo-2024-1-apex-credit-memo",
-        "quote": "Apex Industrial Holdings",
-        "value": "Apex Industrial Holdings",
-    },
-    {
-        "id": "apex-allocation",
-        "label": "CLO allocation",
-        "group": "Apex Industrial",
-        "document_id": "northbridge-clo-2024-1-apex-credit-memo",
-        "quote": "$7,200,000",
-        "value": "$7,200,000",
-    },
-    {
-        "id": "apex-sponsor",
-        "label": "Sponsor",
-        "group": "Apex Industrial",
-        "document_id": "northbridge-clo-2024-1-apex-credit-memo",
-        "quote": "Lakeside Private Equity",
-        "value": "Lakeside Private Equity",
-    },
-    {
-        "id": "apex-rating",
-        "label": "Moody's rating",
-        "group": "Apex Industrial",
-        "document_id": "northbridge-clo-2024-1-apex-credit-memo",
-        "quote": "Moody's corporate family rating is B1",
-        "value": "B1",
-    },
-    {
-        "id": "oc-result",
-        "label": "Class A/B OC result",
-        "group": "August report",
-        "document_id": "northbridge-clo-2024-1-monthly-report-aug-2024",
-        "quote": "124.1% vs 122.5% trigger",
-        "value": "124.1%",
-        "kind": "oc_ratio",
-    },
-    {
-        "id": "helios-watch",
-        "label": "Watchlist name",
-        "group": "August report",
-        "document_id": "northbridge-clo-2024-1-monthly-report-aug-2024",
-        "quote": "Helios Telecom, Inc.",
-        "value": "Helios Telecom, Inc.",
-    },
-]
+FIELD_SPECS: list[dict] = field_specs()
+
+
+def citation_confidence(citations: list, quote: str, kind: str | None = None) -> float:
+    """Lower score when the quote is missing, short, or repeated across the PDF."""
+    if not citations:
+        return 0.22
+    n = len(citations)
+    if n == 1:
+        score = 0.94
+    elif n <= 3:
+        score = 0.82
+    else:
+        score = 0.64
+    if kind == "oc_ratio":
+        score = min(score, 0.88)
+    if len(quote) < 12:
+        score -= 0.08
+    return round(max(0.2, min(0.99, score)), 2)
 
 
 def fields_for_document(document_id: str, pdf_path: Path) -> list[ExtractedField]:
@@ -116,6 +36,9 @@ def fields_for_document(document_id: str, pdf_path: Path) -> list[ExtractedField
         if spec["document_id"] != document_id:
             continue
         citations = locate_quote(pdf_path, spec["quote"])
+        confidence = citation_confidence(citations, spec["quote"], spec.get("kind"))
+        for cite in citations:
+            cite.confidence = confidence
         needs_review = False
         reason = ""
         if spec.get("kind") == "oc_ratio" and oc_ratio_out_of_range(spec["value"]):
@@ -131,10 +54,11 @@ def fields_for_document(document_id: str, pdf_path: Path) -> list[ExtractedField
                 group=spec["group"],
                 value=spec["value"],
                 quote=spec["quote"],
-                confidence=1.0 if citations else 0.2,
+                kind=spec.get("kind") or "",
                 citations=citations,
                 needs_review=needs_review,
                 review_reason=reason,
             )
         )
+    out.sort(key=lambda field: field.confidence)
     return out

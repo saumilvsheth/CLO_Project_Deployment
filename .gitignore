@@ -8,8 +8,9 @@ __pycache__/
 .mypy_cache/
 data/pdfs/*
 !data/pdfs/.gitkeep
-!data/pdfs/northbridge-clo-*.pdf
+!data/pdfs/*.pdf
 data/extractions/
 data/reviews.json
 data/runs/
+data/index.json
 .DS_Store

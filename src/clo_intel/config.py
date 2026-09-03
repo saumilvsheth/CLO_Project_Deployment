@@ -12,6 +12,7 @@ DATA = ROOT / "data"
 PDF_DIR = DATA / "pdfs"
 RUNS_DIR = DATA / "runs"
 REVIEWS_PATH = DATA / "reviews.json"
+INDEX_PATH = DATA / "index.json"
 
 
 def env(name: str, default: str = "") -> str:

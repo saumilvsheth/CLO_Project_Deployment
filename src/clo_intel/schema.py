@@ -29,6 +29,7 @@ class Citation(BaseModel):
     page: int
     quote: str
     bbox: BBox
+    confidence: float = 1.0
 
 
 class ExtractedField(BaseModel):
@@ -38,6 +39,7 @@ class ExtractedField(BaseModel):
     value: str
     quote: str
     confidence: float = 1.0
+    kind: str = ""
     citations: list[Citation] = Field(default_factory=list)
     needs_review: bool = False
     review_reason: str = ""

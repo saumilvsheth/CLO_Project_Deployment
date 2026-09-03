@@ -39,6 +39,7 @@ def list_runs() -> list[dict]:
                 "documentId": ext.get("document_id", path.stem),
                 "filename": ext.get("filename", ""),
                 "documentType": ext.get("document_type", ""),
+                "dealId": ext.get("deal_id", ""),
                 "pages": ext.get("pages", 0),
                 "fieldCount": len(ext.get("fields", [])),
             }

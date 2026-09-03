@@ -5,6 +5,7 @@ from clo_intel.contextualize import fields_for_document
 from clo_intel.extract import extract_pages, page_count
 from clo_intel.guardrails import apply_guardrails
 from clo_intel.library import Document, list_pdfs
+from clo_intel.sample_book import deal_id_for_document
 from clo_intel.schema import ExtractionResult
 from clo_intel.store import save_run
 from clo_intel.telemetry import LOG, configure_logging, set_stage, start_trace
@@ -30,7 +31,7 @@ def run_document(doc: Document) -> ExtractionResult:
         document_type=doc_type,
         filename=doc.filename,
         pages=page_count(doc.path),
-        deal_id="northbridge-clo-2024-1",
+        deal_id=deal_id_for_document(doc.id),
         fields=fields,
         extractor=layout["extractor"],
     )
